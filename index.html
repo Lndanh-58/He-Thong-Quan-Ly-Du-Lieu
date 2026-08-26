@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống Quản Lý Dữ Liệu Chi Cục</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif; }
+        body { display: flex; gap: 20px; padding: 20px; background-color: #f0f2f5; margin: 0; color: #333; }
+        
+        .tree-container, .document-container {
+            background: #ffffff; padding: 20px; border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08); flex: 1;
+        }
+        .tree-container { flex: 0.8; }
+        .document-container { flex: 1.2; display: flex; flex-direction: column; }
+
+        h3 { margin-top: 0; color: #1a365d; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; font-size: 1.1rem; }
+
+        /* Cấu trúc Cây */
+        ul { list-style-type: none; padding-left: 20px; margin: 0; }
+        .tree-root > ul { padding-left: 0; }
+        li { margin: 6px 0; }
+        .node { cursor: pointer; padding: 5px 8px; border-radius: 4px; display: inline-block; transition: background 0.2s; }
+        .node:hover { background-color: #edf2f7; color: #2b6cb0; }
+        .node.active { background-color: #3182ce; color: white; font-weight: bold; }
+        .folder::before { content: "📁 "; }
+        .file-target::before { content: "🏢 "; }
+        .nested { display: none; }
+        .active-tree { display: block; }
+
+        /* Thanh công cụ & Tìm kiếm */
+        .toolbar { display: flex; gap: 10px; margin-bottom: 15px; }
+        .search-box { flex: 1; }
+        .search-box input { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e0; border-radius: 4px; outline: none; }
+        .btn { padding: 8px 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
+        .btn-add { background-color: #38a169; color: white; }
+        .btn-add:hover { background-color: #2f855a; }
+        .btn-action { padding: 4px 6px; font-size: 0.75rem; margin-right: 2px; }
+        .btn-download { background-color: #3182ce; color: white; }
+        .btn-edit { background-color: #d69e2e; color: white; }
+        .btn-share { background-color: #dd6b20; color: white; }
+        .btn-delete { background-color: #e53e3e; color: white; }
+
+        /* Bảng dữ liệu */
+        .table-wrapper { overflow-x: auto; flex-grow: 1; }
+        table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+        th, td { border: 1px solid #e2e8f0; padding: 8px 10px; text-align: left; font-size: 0.85rem; }
+        th { background-color: #f7fafc; color: #4a5568; }
+        tr:hover { background-color: #f8fafc; }
+        .badge { padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; background: #e2e8f0; }
+
+        /* Modal Popup */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; padding: 20px; border-radius: 8px; width: 420px; max-width: 90%; }
+        .modal-content h4 { margin-top: 0; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; margin-bottom: 4px; font-size: 0.85rem; font-weight: 600; }
+        .form-group input, .form-group select { width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 4px; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 15px; }
+
+        @media (max-width: 768px) {
+            body { flex-direction: column; }
+            .tree-container, .document-container { width: 100%; flex: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 1. SƠ ĐỒ CÂY DỮ LIỆU -->
+    <div class="tree-container">
+        <h3>📂 Hệ Thống Quản Lý Dữ Liệu</h3>
+        <ul class="tree-root">
+            <li>
+                <span class="node folder">Chi cục</span>
+                <ul class="nested active-tree">
+                    <li>
+                        <span class="node folder">Khối Phòng Ban (3)</span>
+                        <ul class="nested active-tree">
+                            <li><span class="node file-target" data-id="p-kythuat">Phòng Kỹ thuật</span></li>
+                            <li><span class="node file-target" data-id="p-qlcn">Phòng Quản lý chuyên ngành</span></li>
+                            <li><span class="node file-target" data-id="p-hcth">Phòng HCTH</span></li>
+                        </ul>
+                    </li>
+                    <li>
+                        <span class="node folder">Khối Trạm TT&BVTV Khu vực (8)</span>
+                        <ul class="nested active-tree">
+                            <li><span class="node file-target" data-id="t-lapvo">Trạm TT&BVTV KV Lấp Vò</span></li>
+                            <li><span class="node file-target" data-id="t-sadec">Trạm TT&BVTV KV Sa Đéc</span></li>
+                            <li><span class="node file-target" data-id="t-caolanh">Trạm TT&BVTV KV Cao Lãnh</span></li>
+                            <li><span class="node file-target" data-id="t-tamnong">Trạm TT&BVTV KV Tam Nông</span></li>
+                            <li><span class="node file-target" data-id="t-hongngu">Trạm TT&BVTV KV Hồng Ngự</span></li>
+                            <li><span class="node file-target" data-id="t-chauthanh">Trạm TT&BVTV KV Châu Thành</span></li>
+                            <li><span class="node file-target" data-id="t-cailay">Trạm TT&BVTV KV Cai Lậy</span></li>
+                            <li><span class="node file-target" data-id="t-gocong">Trạm TT&BVTV KV Gò Công</span></li>
+                        </ul>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
+    <!-- 2. DANH SÁCH & THAO TÁC TÀI LIỆU -->
+    <div class="document-container">
+        <h3 id="unit-title">📄 Tất cả tài liệu hệ thống</h3>
+        
+        <div class="toolbar">
+            <div class="search-box">
+                <input type="text" id="search-input" placeholder="🔍 Tìm tên hoặc mã tài liệu..." oninput="renderTable()">
+            </div>
+            <button class="btn btn-add" onclick="openAddModal()">➕ Thêm tài liệu</button>
+        </div>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Mã HS</th>
+                        <th>Tên Tài Liệu</th>
+                        <th>Đơn Vị Quản Lý</th>
+                        <th>Ngày Đăng Tải</th>
+                        <th>Định Dạng</th>
+                        <th>Thao Tác</th>
+                    </tr>
+                </thead>
+                <tbody id="document-tbody">
+                    <!-- Dữ liệu sẽ tự động đổ vào đây -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- MODAL THÊM / CẬP NHẬT TÀI LIỆU GẮN FILE -->
+    <div class="modal" id="docModal">
+        <div class="modal-content">
+            <h4 id="modal-title">➕ Thêm Tài Liệu Mới</h4>
+            <input type="hidden" id="edit-doc-index" value="-1">
+            
+            <div class="form-group">
+                <label>Đơn vị lưu trữ:</label>
+                <select id="doc-unit-select"></select>
+            </div>
+            
+            <div class="form-group">
+                <label>Mã hồ sơ:</label>
+                <input type="text" id="doc-id" placeholder="VD: KT-01">
+            </div>
+
+            <!-- Mục gắn file đính kèm -->
+            <div class="form-group">
+                <label>📌 Đính kèm tập tin (PDF, Word, Excel):</label>
+                <input type="file" id="doc-file-input" accept=".pdf, .docx, .doc, .xlsx, .xls" onchange="handleFileSelect(this)">
+            </div>
+            
+            <div class="form-group">
+                <label>Tên tài liệu:</label>
+                <input type="text" id="doc-name" placeholder="Tên tài liệu sẽ tự điền theo file chọn...">
+            </div>
+            
+            <div class="form-group">
+                <label>Định dạng tập tin:</label>
+                <input type="text" id="doc-type" readonly style="background-color: #edf2f7;" placeholder="Tự động nhận diện...">
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn" onclick="closeModal('docModal')">Hủy</button>
+                <button class="btn btn-add" onclick="saveDocument()">Lưu thông tin</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL CHIA SẺ TÀI LIỆU -->
+    <div class="modal" id="shareModal">
+        <div class="modal-content">
+            <h4>🔄 Chia Sẻ Tài Liệu</h4>
+            <p id="share-doc-info" style="font-size: 0.85rem; color: #4a5568;"></p>
+            <div class="form-group">
+                <label>Chia sẻ sang Phòng / Trạm:</label>
+                <select id="share-target-select"></select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeModal('shareModal')">Hủy</button>
+                <button class="btn btn-share" onclick="confirmShare()">Xác nhận chia sẻ</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const units = {
+            "p-kythuat": "Phòng Kỹ thuật",
+            "p-qlcn": "Phòng Quản lý chuyên ngành",
+            "p-hcth": "Phòng HCTH",
+            "t-lapvo": "Trạm TT&BVTV KV Lấp Vò",
+            "t-sadec": "Trạm TT&BVTV KV Sa Đéc",
+            "t-caolanh": "Trạm TT&BVTV KV Cao Lãnh",
+            "t-tamnong": "Trạm TT&BVTV KV Tam Nông",
+            "t-hongngu": "Trạm TT&BVTV KV Hồng Ngự",
+            "t-chauthanh": "Trạm TT&BVTV KV Châu Thành",
+            "t-cailay": "Trạm TT&BVTV KV Cai Lậy",
+            "t-gocong": "Trạm TT&BVTV KV Gò Công"
+        };
+
+        const initialDocuments = [
+            { id: "KT-01", name: "Quy trình dự báo sâu bệnh mùa vụ 2026", unitId: "p-kythuat", date: "26/08/2026", type: "PDF", fileUrl: null },
+            { id: "CN-01", name: "Danh mục thuốc BVTV được phép sử dụng", unitId: "p-qlcn", date: "25/08/2026", type: "XLSX", fileUrl: null },
+            { id: "HC-01", name: "Quy chế hoạt động nội bộ Chi cục", unitId: "p-hcth", date: "20/08/2026", type: "DOCX", fileUrl: null }
+        ];
+
+        let documents = JSON.parse(localStorage.getItem('docSystemData')) || initialDocuments;
+
+        let selectedUnitId = null;
+        let currentShareDocIndex = null;
+        let selectedFileBlob = null; // Lưu file được chọn từ máy
+
+        function saveData() {
+            // Không lưu fileUrl dạng Blob vào LocalStorage vì blob chỉ hoạt động trong phiên làm việc
+            const docsToSave = documents.map(d => ({ ...d, fileUrl: null }));
+            localStorage.setItem('docSystemData', JSON.stringify(docsToSave));
+        }
+
+        // Đóng mở cây thư mục
+        document.querySelectorAll('.folder').forEach(folder => {
+            folder.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const childUl = this.parentElement.querySelector('.nested');
+                if (childUl) childUl.classList.toggle('active-tree');
+            });
+        });
+
+        document.querySelectorAll('.file-target').forEach(node => {
+            node.addEventListener('click', function(e) {
+                e.stopPropagation();
+                document.querySelectorAll('.node').forEach(n => n.classList.remove('active'));
+                this.classList.add('active');
+
+                selectedUnitId = this.getAttribute('data-id');
+                document.getElementById('unit-title').innerText = `📄 Tài liệu: ${units[selectedUnitId]}`;
+                renderTable();
+            });
+        });
+
+        document.querySelector('.tree-root > li > .node').addEventListener('click', function(e) {
+            e.stopPropagation();
+            document.querySelectorAll('.node').forEach(n => n.classList.remove('active'));
+            this.classList.add('active');
+            selectedUnitId = null;
+            document.getElementById('unit-title').innerText = `📄 Tất cả tài liệu hệ thống`;
+            renderTable();
+        });
+
+        // Xử lý tự động đọc thông tin file khi người dùng đính kèm file từ máy tính
+        function handleFileSelect(input) {
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                selectedFileBlob = URL.createObjectURL(file);
+                
+                // Lấy phần mở rộng định dạng file (PDF, DOCX, XLSX...)
+                const ext = file.name.split('.').pop().toUpperCase();
+                document.getElementById('doc-type').value = ext;
+
+                // Tự động điền tên file vào ô tên tài liệu nếu ô đó chưa có chữ
+                const nameInput = document.getElementById('doc-name');
+                if (!nameInput.value.trim()) {
+                    nameInput.value = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+                }
+            }
+        }
+
+        // Render bảng dữ liệu
+        function renderTable() {
+            const keyword = document.getElementById('search-input').value.trim().toLowerCase();
+            const tbody = document.getElementById('document-tbody');
+            tbody.innerHTML = "";
+
+            const filteredDocs = documents.filter(doc => {
+                const matchUnit = selectedUnitId ? doc.unitId === selectedUnitId : true;
+                const matchKey = doc.name.toLowerCase().includes(keyword) || doc.id.toLowerCase().includes(keyword);
+                return matchUnit && matchKey;
+            });
+
+            if (filteredDocs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#718096;">Không tìm thấy tài liệu nào.</td></tr>`;
+                return;
+            }
+
+            filteredDocs.forEach(doc => {
+                const globalIndex = documents.indexOf(doc);
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><b>${doc.id}</b></td>
+                    <td>${doc.name}</td>
+                    <td><span class="badge">${units[doc.unitId] || 'Không xác định'}</span></td>
+                    <td>${doc.date || '---'}</td>
+                    <td><b>${doc.type}</b></td>
+                    <td>
+                        <button class="btn btn-action btn-download" onclick="downloadDoc(event, ${globalIndex})">📥 Tải</button>
+                        <button class="btn btn-action btn-edit" onclick="openEditModal(${globalIndex})">✏️ Sửa</button>
+                        <button class="btn btn-action btn-share" onclick="openShareModal(${globalIndex})">🔄 Chia sẻ</button>
+                        <button class="btn btn-action btn-delete" onclick="deleteDoc(${globalIndex})">🗑️ Xóa</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Tải tập tin thực tế vừa gắn lên
+        function downloadDoc(event, index) {
+            if (event) event.stopPropagation();
+            const doc = documents[index];
+            
+            const link = document.createElement('a');
+            if (doc.fileUrl) {
+                // Tải file thực tế người dùng vừa upload
+                link.href = doc.fileUrl;
+                link.download = `${doc.name}.${doc.type.toLowerCase()}`;
+            } else {
+                // Nếu là file mẫu ban đầu, tạo nội dung giả lập để tải về
+                const dummyContent = `Nội dung tài liệu: ${doc.name}`;
+                const blob = new Blob([dummyContent], { type: 'text/plain;charset=utf-8' });
+                link.href = URL.createObjectURL(blob);
+                link.download = `${doc.name}.${doc.type.toLowerCase()}`;
+            }
+
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function openAddModal() {
+            document.getElementById('modal-title').innerText = "➕ Thêm Tài Liệu Mới";
+            document.getElementById('edit-doc-index').value = "-1";
+            document.getElementById('doc-id').value = '';
+            document.getElementById('doc-name').value = '';
+            document.getElementById('doc-type').value = '';
+            document.getElementById('doc-file-input').value = '';
+            selectedFileBlob = null;
+            
+            const select = document.getElementById('doc-unit-select');
+            select.innerHTML = "";
+            Object.keys(units).forEach(id => {
+                select.innerHTML += `<option value="${id}" ${id === selectedUnitId ? 'selected' : ''}>${units[id]}</option>`;
+            });
+            document.getElementById('docModal').style.display = 'flex';
+        }
+
+        function openEditModal(index) {
+            const doc = documents[index];
+            document.getElementById('modal-title').innerText = "✏️ Cập Nhật Tài Liệu";
+            document.getElementById('edit-doc-index').value = index;
+            document.getElementById('doc-id').value = doc.id;
+            document.getElementById('doc-name').value = doc.name;
+            document.getElementById('doc-type').value = doc.type;
+            document.getElementById('doc-file-input').value = '';
+            selectedFileBlob = doc.fileUrl || null;
+
+            const select = document.getElementById('doc-unit-select');
+            select.innerHTML = "";
+            Object.keys(units).forEach(id => {
+                select.innerHTML += `<option value="${id}" ${id === doc.unitId ? 'selected' : ''}>${units[id]}</option>`;
+            });
+
+            document.getElementById('docModal').style.display = 'flex';
+        }
+
+        function saveDocument() {
+            const index = parseInt(document.getElementById('edit-doc-index').value);
+            const unitId = document.getElementById('doc-unit-select').value;
+            const id = document.getElementById('doc-id').value.trim();
+            const name = document.getElementById('doc-name').value.trim();
+            let type = document.getElementById('doc-type').value.trim() || 'DOCX';
+
+            if (!id || !name) {
+                alert("Vui lòng nhập đầy đủ Mã hồ sơ và Tên tài liệu!");
+                return;
+            }
+
+            const isDuplicate = documents.some((doc, idx) => doc.id.toLowerCase() === id.toLowerCase() && idx !== index);
+            if (isDuplicate) {
+                alert("Mã hồ sơ này đã tồn tại trên hệ thống! Vui lòng chọn mã khác.");
+                return;
+            }
+
+            const today = new Date().toLocaleDateString('vi-VN');
+
+            if (index === -1) {
+                documents.push({ id, name, unitId, date: today, type, fileUrl: selectedFileBlob });
+            } else {
+                documents[index].id = id;
+                documents[index].name = name;
+                documents[index].unitId = unitId;
+                documents[index].type = type;
+                if (selectedFileBlob) documents[index].fileUrl = selectedFileBlob;
+            }
+
+            saveData();
+            closeModal('docModal');
+            renderTable();
+        }
+
+        function deleteDoc(index) {
+            const doc = documents[index];
+            if (confirm(`Bạn có chắc chắn muốn xóa tài liệu "${doc.name}" không?`)) {
+                documents.splice(index, 1);
+                saveData();
+                renderTable();
+            }
+        }
+
+        function openShareModal(index) {
+            currentShareDocIndex = index;
+            const doc = documents[index];
+            document.getElementById('share-doc-info').innerText = `Tài liệu: "${doc.name}" (Thuộc: ${units[doc.unitId]})`;
+
+            const select = document.getElementById('share-target-select');
+            select.innerHTML = "";
+            Object.keys(units).forEach(id => {
+                if (id !== doc.unitId) {
+                    select.innerHTML += `<option value="${id}">${units[id]}</option>`;
+                }
+            });
+            document.getElementById('shareModal').style.display = 'flex';
+        }
+
+        function confirmShare() {
+            const targetUnitId = document.getElementById('share-target-select').value;
+            const originalDoc = documents[currentShareDocIndex];
+            
+            let newId = `${originalDoc.id}-CS`;
+            let count = 1;
+            while (documents.some(doc => doc.id === newId)) {
+                newId = `${originalDoc.id}-CS${count++}`;
+            }
+
+            const today = new Date().toLocaleDateString('vi-VN');
+
+            documents.push({
+                id: newId,
+                name: `${originalDoc.name} (Chia sẻ)`,
+                unitId: targetUnitId,
+                date: today,
+                type: originalDoc.type,
+                fileUrl: originalDoc.fileUrl
+            });
+
+            saveData();
+            closeModal('shareModal');
+            alert(`Đã chia sẻ thành công tài liệu sang ${units[targetUnitId]}`);
+            renderTable();
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        renderTable();
+    </script>
+</body>
+</html>
