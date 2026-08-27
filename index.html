@@ -210,12 +210,36 @@
 
         let selectedUnitId = null;
         let currentShareDocIndex = null;
-        let selectedFileBlob = null; // Lưu file được chọn từ máy
+        let selectedFileBlob = null;
+
+        // --- CẤU HÌNH ĐỒNG BỘ THỜI GIAN THỰC (REAL-TIME SYNC) ---
+        const syncChannel = new BroadcastChannel('document_system_sync');
+
+        // Lắng nghe sự kiện truyền dữ liệu từ kênh BroadcastChannel
+        syncChannel.onmessage = (event) => {
+            if (event.data && event.data.type === 'SYNC_DATA') {
+                documents = event.data.documents;
+                renderTable();
+            }
+        };
+
+        // Lắng nghe sự kiện thay đổi của localStorage từ các tab/cửa sổ khác
+        window.addEventListener('storage', (event) => {
+            if (event.key === 'docSystemData') {
+                documents = JSON.parse(event.newValue) || [];
+                renderTable();
+            }
+        });
 
         function saveData() {
-            // Không lưu fileUrl dạng Blob vào LocalStorage vì blob chỉ hoạt động trong phiên làm việc
             const docsToSave = documents.map(d => ({ ...d, fileUrl: null }));
             localStorage.setItem('docSystemData', JSON.stringify(docsToSave));
+            
+            // Phát tín hiệu cập nhật thời gian thực đến tất cả các tab đang mở
+            syncChannel.postMessage({
+                type: 'SYNC_DATA',
+                documents: docsToSave
+            });
         }
 
         // Đóng mở cây thư mục
@@ -248,17 +272,15 @@
             renderTable();
         });
 
-        // Xử lý tự động đọc thông tin file khi người dùng đính kèm file từ máy tính
+        // Xử lý tự động đọc thông tin file khi đính kèm file từ máy tính
         function handleFileSelect(input) {
             if (input.files && input.files[0]) {
                 const file = input.files[0];
                 selectedFileBlob = URL.createObjectURL(file);
                 
-                // Lấy phần mở rộng định dạng file (PDF, DOCX, XLSX...)
                 const ext = file.name.split('.').pop().toUpperCase();
                 document.getElementById('doc-type').value = ext;
 
-                // Tự động điền tên file vào ô tên tài liệu nếu ô đó chưa có chữ
                 const nameInput = document.getElementById('doc-name');
                 if (!nameInput.value.trim()) {
                     nameInput.value = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
@@ -303,18 +325,15 @@
             });
         }
 
-        // Tải tập tin thực tế vừa gắn lên
         function downloadDoc(event, index) {
             if (event) event.stopPropagation();
             const doc = documents[index];
             
             const link = document.createElement('a');
             if (doc.fileUrl) {
-                // Tải file thực tế người dùng vừa upload
                 link.href = doc.fileUrl;
                 link.download = `${doc.name}.${doc.type.toLowerCase()}`;
             } else {
-                // Nếu là file mẫu ban đầu, tạo nội dung giả lập để tải về
                 const dummyContent = `Nội dung tài liệu: ${doc.name}`;
                 const blob = new Blob([dummyContent], { type: 'text/plain;charset=utf-8' });
                 link.href = URL.createObjectURL(blob);
